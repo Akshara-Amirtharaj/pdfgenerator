@@ -71,9 +71,13 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
 
 # Updated convert_to_pdf function
 import pypandoc
+import pypandoc.pandoc_download
 
 def convert_to_pdf(doc_path, pdf_path):
     try:
+        # Download pandoc in case it isn't already available
+        pypandoc.pandoc_download.download_pandoc()
+
         # Convert the .docx to .pdf using pypandoc
         pypandoc.convert_file(doc_path, 'pdf', outputfile=pdf_path)
         print(f"Converted to PDF and saved at: {pdf_path}")
