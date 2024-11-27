@@ -70,16 +70,21 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
 
 
 # Updated convert_to_pdf function
-import pypandoc
-
 def convert_to_pdf(doc_path, pdf_path):
+    word = None
     try:
-        # Convert the .docx to .pdf using pypandoc
-        pypandoc.convert_file(doc_path, 'pdf', outputfile=pdf_path)
+        import comtypes.client
+        word = comtypes.client.CreateObject("Word.Application")
+        word.Visible = False
+        doc = word.Documents.Open(doc_path)
+        doc.SaveAs(pdf_path, FileFormat=17)
+        doc.Close()
         print(f"Converted to PDF and saved at: {pdf_path}")
     except Exception as e:
         raise Exception(f"Error converting Word to PDF: {e}")
-
+    finally:
+        if word:
+            word.Quit()
 
 
 # Streamlit App
