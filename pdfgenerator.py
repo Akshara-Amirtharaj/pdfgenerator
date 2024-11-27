@@ -1,7 +1,7 @@
+import subprocess
+import os
 import streamlit as st
 from docx import Document
-import os
-from docx2pdf import convert  # Import docx2pdf
 
 # Function to edit the Word template dynamically
 def edit_word_template(template_path, output_path, name, designation, contact, email, location, selected_services):
@@ -20,8 +20,6 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
                 para.text = para.text.replace("<<Client Email>>", email)
             if "<<Client Location>>" in para.text:
                 para.text = para.text.replace("<<Client Location>>", location)
-                
-                
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
@@ -35,31 +33,24 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
                         cell.text = cell.text.replace("<<Client Email>>", email)
                     if "<<Client Location>>" in cell.text:
                         cell.text = cell.text.replace("<<Client Location>>", location)
-        # Process all tables
-        spoc_table_found = False  # Flag to indicate if the SPOC table is found
-        for table_idx, table in enumerate(doc.tables):
-            # Check for the SPOC table by searching for the text "Supporting SPOC Details"
-            if not spoc_table_found:  # Look for the SPOC identifier
-                for para in doc.paragraphs:
-                    if "Supporting SPOC Details" in para.text:
-                        spoc_table_found = True
-                        break
-
-            if spoc_table_found and table_idx == 0:  # Assuming SPOC table is the first table after the identifier
-                # Update placeholders in the SPOC table
-                for row in table.rows:
-                    if "Project Sponsor/Client’s Detail" in row.cells[0].text:
-                        row.cells[1].text = name
-                        row.cells[2].text = designation
-                        row.cells[3].text = contact
-                        row.cells[4].text = email
-                spoc_table_found = False  # Reset the flag after processing the table
-            else:
-                # Filter rows based on selected services for other tables
-                for row in table.rows[1:]:  # Skip the header row
+        # Process the table to retain only selected services
+        for table in doc.tables:
+            # Check if the table contains the column headers (assumes headers in the first row)
+            if "Name" in table.rows[0].cells[0].text and "Description" in table.rows[0].cells[1].text:
+                # Filter rows based on selected services
+                rows_to_keep = [table.rows[0]]  # Keep the header row
+                for row in table.rows[1:]:
                     service_name = row.cells[0].text.strip()
-                    if service_name not in selected_services:
-                        row._element.getparent().remove(row._element)
+                    if service_name in selected_services:
+                        rows_to_keep.append(row)
+                
+                # Remove all rows and re-add only the filtered rows
+                while len(table.rows) > 0:
+                    table._element.remove(table.rows[0]._element)
+                for row in rows_to_keep:
+                    new_row = table.add_row()
+                    for i, cell in enumerate(row.cells):
+                        new_row.cells[i].text = cell.text
 
         # Save the updated document
         doc.save(output_path)
@@ -70,15 +61,27 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
 
 
 
-# Function to convert Word to PDF using docx2pdf
+
+# Function to convert Word to PDF using LibreOffice
+import os
+import subprocess
+
 def convert_to_pdf(doc_path, pdf_path):
     try:
-        # Convert the Word document to PDF using docx2pdf
-        convert(doc_path, pdf_path)
-        print(f"Converted to PDF and saved at: {pdf_path}")
-    except Exception as e:
-        raise Exception(f"Error converting Word to PDF: {e}")
+        # Construct the LibreOffice command
+        command = [
+            "soffice",
+            "--headless",
+            "--convert-to", "pdf",
+            doc_path,
+            "--outdir", os.path.dirname(pdf_path)
+        ]
 
+        # Run the command
+        subprocess.run(command, check=True)
+        print(f"Converted to PDF and saved at: {pdf_path}")
+    except subprocess.CalledProcessError as e:
+        raise Exception(f"Error converting Word to PDF: {e}")
 
 # Streamlit App
 st.title("Client-Specific PDF Generator")
