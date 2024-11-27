@@ -1,7 +1,6 @@
 import streamlit as st
 from docx import Document
 import os
-from docx2pdf import convert  # Import docx2pdf
 
 # Function to edit the Word template dynamically
 def edit_word_template(template_path, output_path, name, designation, contact, email, location, selected_services):
@@ -70,18 +69,26 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
 
 
 
-# Function to convert Word to PDF using docx2pdf
+# Updated convert_to_pdf function
 def convert_to_pdf(doc_path, pdf_path):
+    word = None
     try:
-        # Convert the Word document to PDF using docx2pdf
-        convert(doc_path, pdf_path)
+        import comtypes.client
+        word = comtypes.client.CreateObject("Word.Application")
+        word.Visible = False
+        doc = word.Documents.Open(doc_path)
+        doc.SaveAs(pdf_path, FileFormat=17)
+        doc.Close()
         print(f"Converted to PDF and saved at: {pdf_path}")
     except Exception as e:
         raise Exception(f"Error converting Word to PDF: {e}")
+    finally:
+        if word:
+            word.Quit()
 
 
 # Streamlit App
-st.title("Client-Specific PDF Generator")
+st.title("Client-Specific PDF Generator ")
 
 # Input fields
 name = st.text_input("Name")
@@ -90,7 +97,7 @@ contact = st.text_input("Contact Number")
 email = st.text_input("Email ID")
 location = st.selectbox("Location", ["India", "ROW"])
 
-# List of all available services
+# List of all available services (ensure this matches your template)
 services = [
     "Landing page website (design + development)",
     "AI Automations (6 Scenarios)",
@@ -128,11 +135,9 @@ if st.button("Generate PDF"):
         st.error("All fields and at least one service must be selected!")
     else:
         try:
-            # Edit the Word template
             edit_word_template(
                 template_path, word_output_path, name, designation, contact, email, location, selected_services
             )
-            # Convert the edited Word document to PDF
             convert_to_pdf(word_output_path, pdf_output_path)
             st.success("PDF generated successfully!")
             with open(pdf_output_path, "rb") as file:
