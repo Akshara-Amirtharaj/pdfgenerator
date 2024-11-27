@@ -88,7 +88,7 @@ def convert_to_pdf(doc_path, pdf_path):
 
 
 # Streamlit App
-st.title("Client-Specific PDF Generator (via Word Template)")
+st.title("Client-Specific PDF Generator ")
 
 # Input fields
 name = st.text_input("Name")
