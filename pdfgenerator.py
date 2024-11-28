@@ -1,8 +1,8 @@
 import streamlit as st
 from docx import Document
 import os
-import requests
 import time
+import requests
 # Function to edit the Word template dynamically
 def edit_word_template(template_path, output_path, name, designation, contact, email, location, selected_services):
     try:
@@ -64,6 +64,8 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
     except Exception as e:
         raise Exception(f"Error editing Word template: {e}")
 # Updated convert_to_pdf function
+
+
 def convert_to_pdf(doc_path, pdf_path):
     api_key = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIxIiwianRpIjoiMjVkNWJkMjlhYjAzZDVmMTVmM2ZiMmM1ZjQ3YjNlNmZkODZkZmE0MjJhOGZiMTlkMjhjMzFkYmJlMDNiYmFhZjRlZTMzNGQ5MzdhMGVmMTciLCJpYXQiOjE3MzI3ODcwMjUuNDA5OTM1LCJuYmYiOjE3MzI3ODcwMjUuNDA5OTM2LCJleHAiOjQ4ODg0NjA2MjUuNDA2MzQxLCJzdWIiOiI3MDMzMDc0OSIsInNjb3BlcyI6WyJ0YXNrLnJlYWQiLCJ0YXNrLndyaXRlIl19.jkpWOMwG7jg0SzxO58A_-Ndhg3iVzgcExwIgbYheAuJ1SLxAH77x0dCd2dIm729779WJmy0UpaOpFHWQ_CFBZKJc7u-MeXcjTZvzt9xraEVvbylb_o0F9TW6-CF5vvO5ps0I7uGznmjyqrVKhxaPYgPux5gKsXe4DuhMp6oiAOb2_i70yDzDOAb9F3DDdCeJVpdtXg0lMYauM6QGYrsUDucqDPFazGY47itApyEwP7S5JIRFQPaozRicL40xaMgiqRUpI65-ByCA4ZTDFqLQBa8T-nIyUNRvST1pU_0FNP3Q4g0PZ6m5U0aNZ9GBHwkUMzveigajDWSZ2h7g2CYZkZ5B9jvxuStyS83vjpod3CvyFEvoNa6gK7IGXJw_PTjNN9EIuGxtSmwvMaonRJKwhaMABVRE1VR0MJ_wx6Ehc91bQFr9YJxyFSRiHrQVBmNh5zoBvJ0ZXyvlUNMre13iqVw5atrTntcVyLTHeZICSiaKelGPmLK9J1ETwaYIwBauUofA0gdRMI1OmY7VCcbtMkiNVUnSkVgjUA6a1eMcOCZVqJycR7T-ijXXcKQloi1Vm0GaCoOPvBoyMdjuSx19sXOdBhyeZXz-iGKVLs_jnHP3fFdKMXEJMgTf6Hvv5KZivxPk2qPmky0gHtJzOs-Ob_t5H5zOl6LpBLvJftGMg8U"  # Replace with your actual API key
     endpoint = "https://api.cloudconvert.com/v2/jobs"
@@ -145,14 +147,15 @@ def convert_to_pdf(doc_path, pdf_path):
 
 
 
-# Streamlit App
-st.title("Client-Specific PDF Generator ")
+
+st.title("Client-Specific PDF Generator")
 # Input fields
 name = st.text_input("Name")
 designation = st.text_input("Designation")
 contact = st.text_input("Contact Number")
 email = st.text_input("Email ID")
 location = st.selectbox("Location", ["India", "ROW"])
+
 # List of all available services (ensure this matches your template)
 services = [
     "Landing page website (design + development)",
@@ -176,13 +179,20 @@ services = [
     "AI Generated Social Media Content & Calendar",
     "Custom AI Models & Agents"
 ]
-# Multi-select for services
-selected_services = st.multiselect("Select Services", services)
+
+# Checkbox to select all services
+select_all = st.checkbox("Select All Services")
+if select_all:
+    selected_services = services
+else:
+    selected_services = st.multiselect("Select Services", services)
+
 # Define paths
 base_dir = os.path.abspath(os.path.dirname(__file__))
 template_path = os.path.join(base_dir, "DM & Automations Services Pricing - Andrew.docx")
 word_output_path = os.path.join(base_dir, "Customized_Pricing.docx")
 pdf_output_path = os.path.join(base_dir, "Customized_Pricing.pdf")
+
 if st.button("Generate PDF"):
     if not all([name, designation, contact, email, location]) or not selected_services:
         st.error("All fields and at least one service must be selected!")
