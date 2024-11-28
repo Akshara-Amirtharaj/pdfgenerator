@@ -1,6 +1,10 @@
 import streamlit as st
 from docx import Document
 import os
+import platform
+import subprocess
+port = int(os.environ.get("PORT", 8501))
+
 
 # Function to edit the Word template dynamically
 def edit_word_template(template_path, output_path, name, designation, contact, email, location, selected_services):
@@ -73,20 +77,24 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
 
 # Updated convert_to_pdf function
 def convert_to_pdf(doc_path, pdf_path):
-    word = None
-    try:
-        import comtypes.client
-        word = comtypes.client.CreateObject("Word.Application")
-        word.Visible = False
-        doc = word.Documents.Open(doc_path)
-        doc.SaveAs(pdf_path, FileFormat=17)
-        doc.Close()
-        print(f"Converted to PDF and saved at: {pdf_path}")
-    except Exception as e:
-        raise Exception(f"Error converting Word to PDF: {e}")
-    finally:
-        if word:
+    if platform.system() == "Windows":
+        try:
+            import comtypes.client
+            word = comtypes.client.CreateObject("Word.Application")
+            doc = word.Documents.Open(doc_path)
+            doc.SaveAs(pdf_path, FileFormat=17)
+            doc.Close()
             word.Quit()
+            print("Converted to PDF using COM")
+        except Exception as e:
+            raise Exception(f"Error using COM on Windows: {e}")
+    else:
+        try:
+            # LibreOffice method for non-Windows
+            subprocess.run(['libreoffice', '--headless', '--convert-to', 'pdf', '--outdir', os.path.dirname(pdf_path), doc_path])
+            print("Converted to PDF using LibreOffice")
+        except Exception as e:
+            raise Exception(f"Error using LibreOffice: {e}")
 
 # Streamlit App
 st.title("Client-Specific PDF Generator")
