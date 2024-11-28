@@ -1,12 +1,12 @@
 import streamlit as st
 from docx import Document
 import os
-import time
-import requests
+
 # Function to edit the Word template dynamically
 def edit_word_template(template_path, output_path, name, designation, contact, email, location, selected_services):
     try:
         doc = Document(template_path)
+
         # Replace placeholders in the general paragraphs
         for para in doc.paragraphs:
             if "<<Client Name>>" in para.text:
@@ -19,7 +19,6 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
                 para.text = para.text.replace("<<Client Email>>", email)
             if "<<Client Location>>" in para.text:
                 para.text = para.text.replace("<<Client Location>>", location)
-                
                 
         for table in doc.tables:
             for row in table.rows:
@@ -34,17 +33,19 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
                         cell.text = cell.text.replace("<<Client Email>>", email)
                     if "<<Client Location>>" in cell.text:
                         cell.text = cell.text.replace("<<Client Location>>", location)
-        # Process all tables
+        # Process tables to find and update the SPOC table and service table separately
         spoc_table_found = False  # Flag to indicate if the SPOC table is found
+
         for table_idx, table in enumerate(doc.tables):
-            # Check for the SPOC table by searching for the text "Supporting SPOC Details"
-            if not spoc_table_found:  # Look for the SPOC identifier
+            if not spoc_table_found:
+                # Check for the SPOC table by searching for the text "Supporting SPOC Details"
                 for para in doc.paragraphs:
                     if "Supporting SPOC Details" in para.text:
                         spoc_table_found = True
                         break
+
+            # If this is the SPOC table, update placeholders
             if spoc_table_found and table_idx == 0:  # Assuming SPOC table is the first table after the identifier
-                # Update placeholders in the SPOC table
                 for row in table.rows:
                     if "Project Sponsor/Client’s Detail" in row.cells[0].text:
                         row.cells[1].text = name
@@ -52,103 +53,42 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
                         row.cells[3].text = contact
                         row.cells[4].text = email
                 spoc_table_found = False  # Reset the flag after processing the table
+
             else:
-                # Filter rows based on selected services for other tables
-                for row in table.rows[1:]:  # Skip the header row
+                # Filter rows based on selected services for the other tables
+                # Skip the first row (assuming it's a header row)
+                for row in table.rows[1:]:
+                    # Clean and normalize the service name in the cell text
                     service_name = row.cells[0].text.strip()
+                    # Check if the service name is not in the selected services list
                     if service_name not in selected_services:
+                        # Remove the row from the table
                         row._element.getparent().remove(row._element)
+
         # Save the updated document
         doc.save(output_path)
         print(f"Word document updated and saved at: {output_path}")
     except Exception as e:
         raise Exception(f"Error editing Word template: {e}")
+
 # Updated convert_to_pdf function
-
-
 def convert_to_pdf(doc_path, pdf_path):
-    api_key = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIxIiwianRpIjoiMTM3YjYxN2MyZDE0YzZlODI5YzBhYjBjYTkwNTFjZWIzNTZkYWRkODZkNzA4YzdkZjdiNTFkNzQwM2Q3YjcyZTljYWRlNTlmYTAwMDVkNDIiLCJpYXQiOjE3MzI4MDIzNDcuNzg4OTA4LCJuYmYiOjE3MzI4MDIzNDcuNzg4OTA5LCJleHAiOjQ4ODg0NzU5NDcuNzg0NzU5LCJzdWIiOiI0MjI0NzE0NiIsInNjb3BlcyI6WyJ0YXNrLnJlYWQiLCJ0YXNrLndyaXRlIl19.dVZEERLlMOnbmjgLa15p-UAT4-vgDY14QCr64CZiFJcGZ3YZ1Mfyz6XOM7OSOR_ox_UpA_YNqnJidJiV-LX9-UyXpH8HGf7n4fOpPifXquISRrwTm9_GcHjRfXsBM9YZGKVPsWlk79Ux-uautcWy1opSpe1d0Nqppkh6lS-QjmWR0zMI5LQJhGBDIPCryBFFpEIoTddAqzMHriXeVo1mw9SSH29Zswifx5aoMTZa7s6MuSwM4baxWRuY4s51bbIu9_Pwyd-me9GYlIxoJRHvKJ-znvTh1Nw_QyKwmM8VqeAAzBweonWXepasWxtwRNpfeG4J_-biIk845Q2B-Yr4VIw_0W-36L7ALmat3h-IejQ42m9ViwWeAfqp3uheQfhnuZQUi7fKWVuXKnKe8FyCvOwVVj7i728brp7X10vhwRkTuZvM-Qn48ivO5NrNyI9IJUxEAp1ROT5qALp0e6ywDoUVLZejrNUorL3YRcTjGOVazxKFLQnMaTb3fqLG6jYK3pfpO5RdgWKVjhwPrfHyLUhloPcHrCCrq0vGOKz5wG0h5E2nICHWrIeuAWXKTLXuPL5x7dplS1evIoOpwIBygP_W099rdvMWzcRSp2ylLETDuHNPGJ_Srs7yfLsg9vElL_ph4fI_ZFn8-Q9qm66bp6dvAWFGMxveO3l9mvEhZHY"
-  # Replace with your actual API key
-    endpoint = "https://api.cloudconvert.com/v2/jobs"
-
-
+    word = None
     try:
-        # Step 1: Create a conversion job with tasks
-        job_payload = {
-            "tasks": {
-                "upload-task": {
-                    "operation": "import/upload"
-                },
-                "convert-task": {
-                    "operation": "convert",
-                    "input": "upload-task",
-                    "input_format": "docx",
-                    "output_format": "pdf"
-                },
-                "export-task": {
-                    "operation": "export/url",
-                    "input": "convert-task"
-                }
-            }
-        }
-
-        # Create the job
-        job_response = requests.post(
-            endpoint,
-            headers={"Authorization": f"Bearer {api_key}"},
-            json=job_payload
-        )
-        if job_response.status_code != 201:
-            raise Exception(f"Job creation failed: {job_response.json()}")
-
-        job_data = job_response.json()
-        upload_task_result = job_data["data"]["tasks"][0]["result"]["form"]
-        upload_url = upload_task_result["url"]
-        upload_parameters = upload_task_result["parameters"]
-
-        # Step 2: Upload the file to the provided URL
-        with open(doc_path, "rb") as file:
-            upload_response = requests.post(upload_url, files={"file": file}, data=upload_parameters)
-        if upload_response.status_code not in [200, 201]:
-            raise Exception(f"File upload failed: {upload_response.text}")
-
-        # Step 3: Poll the job status until it finishes
-        job_id = job_data["data"]["id"]
-        while True:
-            status_response = requests.get(
-                f"{endpoint}/{job_id}",
-                headers={"Authorization": f"Bearer {api_key}"}
-            )
-            status_data = status_response.json()
-            if status_data["data"]["status"] == "finished":
-                break
-            elif status_data["data"]["status"] == "error":
-                raise Exception(f"Job failed: {status_data}")
-            time.sleep(3)  # Wait before polling again
-
-        # Step 4: Locate the export task and download the converted file
-        output_url = None
-        for task in status_data["data"]["tasks"]:
-            if task["operation"] == "export/url":
-                output_url = task["result"]["files"][0]["url"]
-                break
-
-        if not output_url:
-            raise Exception("Export task with file URL not found.")
-
-        # Download the converted file
-        pdf_response = requests.get(output_url)
-        with open(pdf_path, "wb") as output_file:
-            output_file.write(pdf_response.content)
-
-        print(f"PDF saved at {pdf_path}")
-
+        import comtypes.client
+        word = comtypes.client.CreateObject("Word.Application")
+        word.Visible = False
+        doc = word.Documents.Open(doc_path)
+        doc.SaveAs(pdf_path, FileFormat=17)
+        doc.Close()
+        print(f"Converted to PDF and saved at: {pdf_path}")
     except Exception as e:
-        raise Exception(f"Error during PDF conversion: {e}")
+        raise Exception(f"Error converting Word to PDF: {e}")
+    finally:
+        if word:
+            word.Quit()
 
-
-
-
+# Streamlit App
 st.title("Client-Specific PDF Generator")
 # Input fields
 name = st.text_input("Name")
@@ -161,10 +101,10 @@ location = st.selectbox("Location", ["India", "ROW"])
 services = [
     "Landing page website (design + development)",
     "AI Automations (6 Scenarios)",
-    "WhatsApp Automation + WhatsApp Cloud Business Account Setup",
+    "Whatsapp Automation + Whatsapp Cloud Business Account Setup",
     "CRM Setup",
     "Email Marketing Setup",
-    "Make/Zapier Automation Setup",
+    "Make/Zapier Automation",
     "Firefly Meeting Automation",
     "Marketing Strategy",
     "Social Media Channels",
