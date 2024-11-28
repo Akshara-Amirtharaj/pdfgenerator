@@ -1,7 +1,8 @@
 import streamlit as st
 from docx import Document
 import os
-
+import requests
+import time
 # Function to edit the Word template dynamically
 def edit_word_template(template_path, output_path, name, designation, contact, email, location, selected_services):
     try:
@@ -73,20 +74,84 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
 
 # Updated convert_to_pdf function
 def convert_to_pdf(doc_path, pdf_path):
-    word = None
+    api_key = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIxIiwianRpIjoiMjVkNWJkMjlhYjAzZDVmMTVmM2ZiMmM1ZjQ3YjNlNmZkODZkZmE0MjJhOGZiMTlkMjhjMzFkYmJlMDNiYmFhZjRlZTMzNGQ5MzdhMGVmMTciLCJpYXQiOjE3MzI3ODcwMjUuNDA5OTM1LCJuYmYiOjE3MzI3ODcwMjUuNDA5OTM2LCJleHAiOjQ4ODg0NjA2MjUuNDA2MzQxLCJzdWIiOiI3MDMzMDc0OSIsInNjb3BlcyI6WyJ0YXNrLnJlYWQiLCJ0YXNrLndyaXRlIl19.jkpWOMwG7jg0SzxO58A_-Ndhg3iVzgcExwIgbYheAuJ1SLxAH77x0dCd2dIm729779WJmy0UpaOpFHWQ_CFBZKJc7u-MeXcjTZvzt9xraEVvbylb_o0F9TW6-CF5vvO5ps0I7uGznmjyqrVKhxaPYgPux5gKsXe4DuhMp6oiAOb2_i70yDzDOAb9F3DDdCeJVpdtXg0lMYauM6QGYrsUDucqDPFazGY47itApyEwP7S5JIRFQPaozRicL40xaMgiqRUpI65-ByCA4ZTDFqLQBa8T-nIyUNRvST1pU_0FNP3Q4g0PZ6m5U0aNZ9GBHwkUMzveigajDWSZ2h7g2CYZkZ5B9jvxuStyS83vjpod3CvyFEvoNa6gK7IGXJw_PTjNN9EIuGxtSmwvMaonRJKwhaMABVRE1VR0MJ_wx6Ehc91bQFr9YJxyFSRiHrQVBmNh5zoBvJ0ZXyvlUNMre13iqVw5atrTntcVyLTHeZICSiaKelGPmLK9J1ETwaYIwBauUofA0gdRMI1OmY7VCcbtMkiNVUnSkVgjUA6a1eMcOCZVqJycR7T-ijXXcKQloi1Vm0GaCoOPvBoyMdjuSx19sXOdBhyeZXz-iGKVLs_jnHP3fFdKMXEJMgTf6Hvv5KZivxPk2qPmky0gHtJzOs-Ob_t5H5zOl6LpBLvJftGMg8U"  # Replace with your actual API key
+    endpoint = "https://api.cloudconvert.com/v2/jobs"
+
+
     try:
-        import comtypes.client
-        word = comtypes.client.CreateObject("Word.Application")
-        word.Visible = False
-        doc = word.Documents.Open(doc_path)
-        doc.SaveAs(pdf_path, FileFormat=17)
-        doc.Close()
-        print(f"Converted to PDF and saved at: {pdf_path}")
+        # Step 1: Create a conversion job with tasks
+        job_payload = {
+            "tasks": {
+                "upload-task": {
+                    "operation": "import/upload"
+                },
+                "convert-task": {
+                    "operation": "convert",
+                    "input": "upload-task",
+                    "input_format": "docx",
+                    "output_format": "pdf"
+                },
+                "export-task": {
+                    "operation": "export/url",
+                    "input": "convert-task"
+                }
+            }
+        }
+
+        # Create the job
+        job_response = requests.post(
+            endpoint,
+            headers={"Authorization": f"Bearer {api_key}"},
+            json=job_payload
+        )
+        if job_response.status_code != 201:
+            raise Exception(f"Job creation failed: {job_response.json()}")
+
+        job_data = job_response.json()
+        upload_task_result = job_data["data"]["tasks"][0]["result"]["form"]
+        upload_url = upload_task_result["url"]
+        upload_parameters = upload_task_result["parameters"]
+
+        # Step 2: Upload the file to the provided URL
+        with open(doc_path, "rb") as file:
+            upload_response = requests.post(upload_url, files={"file": file}, data=upload_parameters)
+        if upload_response.status_code not in [200, 201]:
+            raise Exception(f"File upload failed: {upload_response.text}")
+
+        # Step 3: Poll the job status until it finishes
+        job_id = job_data["data"]["id"]
+        while True:
+            status_response = requests.get(
+                f"{endpoint}/{job_id}",
+                headers={"Authorization": f"Bearer {api_key}"}
+            )
+            status_data = status_response.json()
+            if status_data["data"]["status"] == "finished":
+                break
+            elif status_data["data"]["status"] == "error":
+                raise Exception(f"Job failed: {status_data}")
+            time.sleep(3)  # Wait before polling again
+
+        # Step 4: Locate the export task and download the converted file
+        output_url = None
+        for task in status_data["data"]["tasks"]:
+            if task["operation"] == "export/url":
+                output_url = task["result"]["files"][0]["url"]
+                break
+
+        if not output_url:
+            raise Exception("Export task with file URL not found.")
+
+        # Download the converted file
+        pdf_response = requests.get(output_url)
+        with open(pdf_path, "wb") as output_file:
+            output_file.write(pdf_response.content)
+
+        print(f"PDF saved at {pdf_path}")
+
     except Exception as e:
-        raise Exception(f"Error converting Word to PDF: {e}")
-    finally:
-        if word:
-            word.Quit()
+        raise Exception(f"Error during PDF conversion: {e}")
+
 
 # Streamlit App
 st.title("Client-Specific PDF Generator")
