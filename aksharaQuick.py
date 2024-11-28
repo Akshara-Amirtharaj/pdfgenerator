@@ -1,10 +1,15 @@
 import streamlit as st
 from docx import Document
+import platform
+import subprocess
 import os
+
+
 # Function to edit the Word template dynamically
 def edit_word_template(template_path, output_path, name, designation, contact, email, location, selected_services):
     try:
         doc = Document(template_path)
+
         # Replace placeholders in the general paragraphs
         for para in doc.paragraphs:
             if "<<Client Name>>" in para.text:
@@ -41,6 +46,7 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
                     if "Supporting SPOC Details" in para.text:
                         spoc_table_found = True
                         break
+
             if spoc_table_found and table_idx == 0:  # Assuming SPOC table is the first table after the identifier
                 # Update placeholders in the SPOC table
                 for row in table.rows:
@@ -56,35 +62,48 @@ def edit_word_template(template_path, output_path, name, designation, contact, e
                     service_name = row.cells[0].text.strip()
                     if service_name not in selected_services:
                         row._element.getparent().remove(row._element)
+
         # Save the updated document
         doc.save(output_path)
         print(f"Word document updated and saved at: {output_path}")
+
     except Exception as e:
         raise Exception(f"Error editing Word template: {e}")
+
+
+
 # Updated convert_to_pdf function
 def convert_to_pdf(doc_path, pdf_path):
-    word = None
-    try:
-        import comtypes.client
-        word = comtypes.client.CreateObject("Word.Application")
-        word.Visible = False
-        doc = word.Documents.Open(doc_path)
-        doc.SaveAs(pdf_path, FileFormat=17)
-        doc.Close()
-        print(f"Converted to PDF and saved at: {pdf_path}")
-    except Exception as e:
-        raise Exception(f"Error converting Word to PDF: {e}")
-    finally:
-        if word:
+    if platform.system() == "Windows":
+        try:
+            import comtypes.client
+            word = comtypes.client.CreateObject("Word.Application")
+            doc = word.Documents.Open(doc_path)
+            doc.SaveAs(pdf_path, FileFormat=17)
+            doc.Close()
             word.Quit()
+            print("Converted to PDF using COM")
+        except Exception as e:
+            raise Exception(f"Error using COM on Windows: {e}")
+    else:
+        try:
+            # LibreOffice method for non-Windows
+            subprocess.run(['libreoffice', '--headless', '--convert-to', 'pdf', '--outdir', os.path.dirname(pdf_path), doc_path])
+            print("Converted to PDF using LibreOffice")
+        except Exception as e:
+            raise Exception(f"Error using LibreOffice: {e}")
+
+
 # Streamlit App
 st.title("Client-Specific PDF Generator ")
+
 # Input fields
 name = st.text_input("Name")
 designation = st.text_input("Designation")
 contact = st.text_input("Contact Number")
 email = st.text_input("Email ID")
 location = st.selectbox("Location", ["India", "ROW"])
+
 # List of all available services (ensure this matches your template)
 services = [
     "Landing page website (design + development)",
@@ -108,13 +127,16 @@ services = [
     "AI Generated Social Media Content & Calendar",
     "Custom AI Models & Agents"
 ]
+
 # Multi-select for services
 selected_services = st.multiselect("Select Services", services)
+
 # Define paths
-base_dir = os.path.abspath(os.path.dirname(_file_))
+base_dir = os.path.abspath(os.path.dirname(__file__))
 template_path = os.path.join(base_dir, "DM & Automations Services Pricing - Andrew.docx")
 word_output_path = os.path.join(base_dir, "Customized_Pricing.docx")
 pdf_output_path = os.path.join(base_dir, "Customized_Pricing.pdf")
+
 if st.button("Generate PDF"):
     if not all([name, designation, contact, email, location]) or not selected_services:
         st.error("All fields and at least one service must be selected!")
@@ -129,3 +151,6 @@ if st.button("Generate PDF"):
                 st.download_button("Download PDF", file, file_name="Customized_Pricing.pdf")
         except Exception as e:
             st.error(f"An error occurred: {e}")
+
+
+# i have this code and word is converted to pdf using com
